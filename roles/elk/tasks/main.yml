@@ -1,0 +1,50 @@
+---
+- name: Установка Git
+  dnf:
+    name: git
+    state: present
+  when: ansible_os_family == "RedHat"
+
+- name: Клонирование готового стека ELK
+  git:
+    repo: 'https://github.com/deviantony/docker-elk.git'
+    dest: /opt/elk
+    version: main  # или можно указать конкретный тег/коммит
+  tags: [elk]
+
+- name: Обновление Docker Compose до V2
+  shell: |
+    curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
+    chmod +x /usr/local/bin/docker-compose
+    /usr/local/bin/docker-compose --version
+  register: compose_update
+  changed_when: "'version' in compose_update.stdout"
+  tags: [elk]
+
+- name: Запуск Elasticsearch
+  shell: |
+    cd /opt/elk
+    docker compose up -d elasticsearch
+  tags: [elk]
+
+- name: Ожидание запуска Elasticsearch
+  wait_for:
+    port: 9200
+    delay: 10
+    timeout: 120
+  tags: [elk]
+
+- name: Инициализация пользователей ELK
+  shell: |
+    cd /opt/elk
+    docker compose --profile setup up setup
+  register: setup_result
+  changed_when: "'User created' in setup_result.stdout or 'User exists' in setup_result.stdout"
+  tags: [elk]
+  ignore_errors: yes
+
+- name: Запуск полного стека ELK
+  shell: |
+    cd /opt/elk
+    docker compose up -d
+  tags: [elk]

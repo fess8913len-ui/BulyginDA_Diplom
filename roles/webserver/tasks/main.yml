@@ -1,0 +1,70 @@
+---
+- name: Установка nginx
+  package:
+    name: nginx
+    state: present
+  register: nginx_install
+  notify:
+    - reload systemd daemon
+
+- name: Открытие порта 80 (HTTP) в firewalld
+  firewalld:
+    service: http
+    permanent: yes
+    state: enabled
+    immediate: yes
+  when: ansible_os_family == "RedHat"
+  notify: reload firewalld
+
+- name: Создание директории для сайта
+  file:
+    path: /var/www/diploma
+    state: directory
+    owner: nginx
+    group: nginx
+    mode: '0755'
+
+- name: Размещение демо страницы
+  template:
+    src: index.html.j2
+    dest: /var/www/diploma/index.html
+    owner: nginx
+    group: nginx
+    mode: '0644'
+  notify: reload nginx
+
+- name: Настройка конфигурации nginx
+  template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload nginx
+
+- name: Удаление дефолтной страницы nginx
+  file:
+    path: /usr/share/nginx/html/index.html
+    state: absent
+  ignore_errors: yes
+
+- name: Запуск и включение nginx
+  systemd:
+    name: nginx
+    state: started
+    enabled: yes
+
+- name: Проверка доступности health endpoint с bastion
+  uri:
+    url: "http://{{ ansible_fqdn }}/ping"
+    status_code: 200
+  register: health_check
+  until: health_check.status == 200
+  retries: 5
+  delay: 2
+  delegate_to: "{{ groups['bastion'][0] }}"  # Запустить с bastion
+  when: "'webservers' in group_names"
+
+- name: Вывод информации о статусе
+  debug:
+    msg: "✅ Nginx успешно установлен и работает на {{ ansible_hostname }}"

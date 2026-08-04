@@ -1,0 +1,70 @@
+---
+- name: Настройка всех серверов
+  hosts: all
+  become: yes
+  roles:
+    - common
+  tags: common
+
+- name: Настройка web серверов
+  hosts: webservers
+  become: yes
+  roles:
+    - webserver
+  tags: webserver
+
+- name: Установка Docker и Docker Compose ELK
+  hosts: elk
+  become: true
+  roles:
+    - role: geerlingguy.docker
+  vars:
+    docker_users: 
+      - user
+
+- name: Развертывание ELK стека
+  hosts: elk
+  become: true
+  roles:
+    - elk
+  tags: elk
+
+- name: Установка Docker и Docker Compose на web-серверы
+  hosts: webservers
+  become: true
+  roles:
+    - role: geerlingguy.docker
+  vars:
+    docker_users:
+      - user
+  tags: filebeat
+
+- name: Установка Filebeat на все хосты
+  hosts: webservers
+  become: yes
+  vars:
+    logstash_beats_port: 5044
+  roles:
+    - filebeat
+  tags: filebeat
+
+- name: Установка и настройка PostgreSQL
+  hosts: zabbix
+  become: yes
+  roles:
+    - postgresql  # Ваша локальная роль
+  tags: postgresql
+
+- name: Установка Zabbix Server
+  hosts: zabbix
+  become: yes
+  roles:
+    - zabbix
+  tags: zabbix
+
+- name: Установка Zabbix Agent на все хосты
+  hosts: all
+  become: yes
+  roles:
+    - zabbix_agent
+  tags: zabbix-agent

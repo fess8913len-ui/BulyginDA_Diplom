@@ -1,0 +1,26 @@
+---
+- name: restart zabbix-server
+  ansible.builtin.service:
+    name: zabbix-server
+    state: restarted
+
+- name: restart nginx
+  ansible.builtin.service:
+    name: nginx
+    state: restarted
+
+- name: restart php-fpm
+  ansible.builtin.service:
+    name: php-fpm
+    state: restarted
+
+- name: reload firewalld
+  systemd:
+    name: firewalld
+    state: reloaded
+
+# В файле handlers/main.yml
+- name: restart php-fpm
+  systemd:
+    name: php-fpm
+    state: restarted

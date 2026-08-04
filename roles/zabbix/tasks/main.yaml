@@ -1,0 +1,245 @@
+---
+- name: Установка репозитория Zabbix
+  ansible.builtin.shell: |
+    rpm -Uvh https://repo.zabbix.com/zabbix/7.0/rhel/9/x86_64/zabbix-release-7.0-1.el9.noarch.rpm
+  args:
+    creates: /etc/yum.repos.d/zabbix.repo
+  register: repo_install
+  changed_when: "'already installed' not in repo_install.stdout"
+
+- name: Отключение GPG проверки для Zabbix репозитория
+  ansible.builtin.replace:
+    path: /etc/yum.repos.d/zabbix.repo
+    regexp: '^gpgcheck=1'
+    replace: 'gpgcheck=0'
+  when: ansible_os_family == "RedHat"
+
+- name: Установка пакетов Zabbix Server
+  ansible.builtin.dnf:
+    name:
+      - zabbix-server-pgsql
+      - zabbix-sql-scripts
+      - zabbix-agent
+      - zabbix-web-pgsql
+      - zabbix-nginx-conf
+      - zabbix-selinux-policy
+      - nginx
+      - php-fpm
+      - php-pgsql
+      - php-gd
+      - php-mbstring
+      - php-bcmath
+      - php-xml
+      - php-ldap
+    state: present
+
+- name: Импорт схемы Zabbix в базу данных
+  ansible.builtin.shell: |
+    zcat /usr/share/zabbix-sql-scripts/postgresql/server.sql.gz | sudo -u postgres psql -d zabbix 2>&1
+  args:
+    creates: /var/lib/pgsql/data/zabbix_schema_imported
+  register: db_import
+  changed_when: "'ERROR' not in db_import.stderr"
+  ignore_errors: true
+
+- name: Создание маркера импорта схемы
+  ansible.builtin.file:
+    path: /var/lib/pgsql/data/zabbix_schema_imported
+    state: touch
+    owner: postgres
+    group: postgres
+  when: db_import.changed or db_import.rc == 0
+
+- name: Выдача прав пользователю zabbix на базу данных
+  ansible.builtin.shell: |
+    psql -c "GRANT ALL PRIVILEGES ON DATABASE zabbix TO zabbix;"
+    psql -d zabbix -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO zabbix;"
+    psql -d zabbix -c "GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO zabbix;"
+    psql -d zabbix -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO zabbix;"
+    psql -d zabbix -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO zabbix;"
+  become: yes
+  become_user: postgres
+  when: db_import.changed or db_import.rc == 0
+  register: grant_privileges
+  changed_when: true
+  ignore_errors: true
+
+- name: Configure PHP session directory permissions for Zabbix
+  file:
+    path: /var/lib/php/session
+    state: directory
+    owner: nginx
+    group: nginx
+    mode: '1777'
+  notify: restart php-fpm
+
+- name: Перезапуск Zabbix Server после выдачи прав
+  ansible.builtin.systemd:
+    name: zabbix-server
+    state: restarted
+    enabled: true
+  when: grant_privileges.changed
+
+- name: Настройка zabbix_server.conf
+  ansible.builtin.lineinfile:
+    path: /etc/zabbix/zabbix_server.conf
+    regexp: "^{{ item.key }}"
+    line: "{{ item.key }}={{ item.value }}"
+    state: present
+  loop:
+    - { key: "DBHost", value: "localhost" }
+    - { key: "DBName", value: "zabbix" }
+    - { key: "DBUser", value: "zabbix" }
+    - { key: "DBPassword", value: "{{ postgresql_zabbix_password | default('zabbix_pass') }}" }
+    - { key: "LogFile", value: "/var/log/zabbix/zabbix_server.log" }
+    - { key: "LogFileSize", value: "10" }
+    - { key: "PidFile", value: "/var/run/zabbix/zabbix_server.pid" }
+  notify: restart zabbix-server
+
+- name: Настройка PHP timezone
+  ansible.builtin.lineinfile:
+    path: /etc/php.ini
+    regexp: '^date.timezone'
+    line: 'date.timezone = Europe/Moscow'
+
+- name: Настройка Zabbix PHP-FPM
+  ansible.builtin.copy:
+    dest: /etc/php-fpm.d/zabbix.conf
+    content: |
+      [zabbix]
+      user = nginx
+      group = nginx
+      listen = /run/php-fpm/zabbix.sock
+      listen.owner = nginx
+      listen.group = nginx
+      pm = dynamic
+      pm.max_children = 50
+      pm.start_servers = 5
+      pm.min_spare_servers = 5
+      pm.max_spare_servers = 35
+      php_admin_value[error_log] = /var/log/php-fpm/zabbix-error.log
+      php_admin_flag[log_errors] = on
+    mode: 0644
+
+- name: Создание конфигурации Zabbix PHP
+  ansible.builtin.template:
+    src: zabbix.conf.php.j2
+    dest: /etc/zabbix/web/zabbix.conf.php
+    owner: nginx
+    group: nginx
+    mode: 0640
+
+- name: Открытие портов для Zabbix в firewalld
+  ansible.builtin.firewalld:
+    port: "{{ item.port }}/{{ item.protocol }}"
+    permanent: yes
+    state: enabled
+    immediate: yes
+  loop:
+    - { port: 8080, protocol: tcp }   # Веб-интерфейс Zabbix
+    - { port: 10051, protocol: tcp }  # Zabbix Server (агенты подключаются сюда)
+    - { port: 10050, protocol: tcp }  # Zabbix Agent (для самомониторинга)
+  when: ansible_os_family == "RedHat"
+  notify: reload firewalld
+
+- name: Создание конфига Nginx для Zabbix с /ping
+  ansible.builtin.copy:
+    dest: /etc/nginx/conf.d/zabbix.conf
+    content: |
+      server {
+          listen          8080;
+          server_name     _;
+
+          root    /usr/share/zabbix;
+
+          index   index.php;
+
+          # Healthcheck endpoint
+          location = /ping {
+              access_log off;
+              return 200 "pong\n";
+              add_header Content-Type text/plain;
+          }
+
+          location = /favicon.ico {
+                  log_not_found   off;
+          }
+
+          location / {
+                  try_files       $uri $uri/ =404;
+          }
+
+          location /assets {
+                  access_log      off;
+                  expires         10d;
+          }
+
+          location ~ /\.ht {
+                  deny            all;
+          }
+
+          location ~ /(api\/|conf[^\.]|include|locale) {
+                  deny            all;
+                  return          404;
+          }
+
+          location /vendor {
+                  deny            all;
+                  return          404;
+          }
+
+          location ~ [^/]\.php(/|$) {
+                  fastcgi_pass    unix:/run/php-fpm/zabbix.sock;
+                  fastcgi_split_path_info ^(.+\.php)(/.+)$;
+                  fastcgi_index   index.php;
+
+                  fastcgi_param   DOCUMENT_ROOT   /usr/share/zabbix;
+                  fastcgi_param   SCRIPT_FILENAME /usr/share/zabbix$fastcgi_script_name;
+                  fastcgi_param   PATH_TRANSLATED /usr/share/zabbix$fastcgi_script_name;
+
+                  include fastcgi_params;
+                  fastcgi_param   QUERY_STRING    $query_string;
+                  fastcgi_param   REQUEST_METHOD  $request_method;
+                  fastcgi_param   CONTENT_TYPE    $content_type;
+                  fastcgi_param   CONTENT_LENGTH  $content_length;
+
+                  fastcgi_intercept_errors        on;
+                  fastcgi_ignore_client_abort     off;
+                  fastcgi_connect_timeout         60;
+                  fastcgi_send_timeout            180;
+                  fastcgi_read_timeout            180;
+                  fastcgi_buffer_size             128k;
+                  fastcgi_buffers                 4 256k;
+                  fastcgi_busy_buffers_size       256k;
+                  fastcgi_temp_file_write_size    256k;
+          }
+      }
+    owner: nginx
+    group: nginx
+    mode: '0644'
+  notify: restart nginx
+
+- name: Запуск и включение сервисов
+  ansible.builtin.service:
+    name: "{{ item }}"
+    state: started
+    enabled: true
+  loop:
+    - zabbix-server
+    - nginx
+    - php-fpm
+    - zabbix-agent
+
+- name: Проверка статуса Zabbix Server
+  ansible.builtin.command: systemctl is-active zabbix-server
+  register: zabbix_status
+  changed_when: false
+  ignore_errors: true
+
+- name: Отладка - информация о доступе
+  ansible.builtin.debug:
+    msg:
+      - "Zabbix Server установлен!"
+      - "Веб-интерфейс доступен по адресу: http://{{ ansible_default_ipv4.address }}/zabbix"
+      - "Логин по умолчанию: Admin / Пароль: zabbix"
+      - "Статус Zabbix Server: {{ zabbix_status.stdout }}"

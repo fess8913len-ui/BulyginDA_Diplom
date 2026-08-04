@@ -1,0 +1,35 @@
+# Zabbix Agent configuration file
+
+# Server IP address (Zabbix Server)
+Server={{ hostvars['zabbix']['ansible_host'] | default('10.0.2.7') }}
+
+# ServerActive IP address (Zabbix Server)
+ServerActive={{ hostvars['zabbix']['ansible_host'] | default('10.0.2.7') }}
+
+# Hostname of this agent
+Hostname={{ ansible_hostname }}
+
+# Log file
+LogFile=/var/log/zabbix/zabbix_agentd.log
+LogFileSize=10
+
+# Debug level (3 = info)
+DebugLevel=3
+
+# Timeout for checks (seconds)
+Timeout=30
+
+# Allow root to run checks
+AllowRoot=1
+
+# Include user parameters
+Include=/etc/zabbix/zabbix_agentd.d/*.conf
+
+# Passive checks port
+ListenPort=10050
+
+# PID file location
+PidFile=/run/zabbix/zabbix_agentd.pid
+
+# User to run agent as
+User=zabbix

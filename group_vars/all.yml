@@ -1,0 +1,10 @@
+---
+# Zabbix Server IP - автоматически из инвентаря
+zabbix_server_host: "{{ hostvars['zabbix']['ansible_host'] }}"
+
+# PostgreSQL пароль
+postgresql_zabbix_password: "my_secure_password_123"
+postgresql_version: 14
+
+# Zabbix версия
+zabbix_server_version: "7.0"

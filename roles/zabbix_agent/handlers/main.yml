@@ -1,0 +1,10 @@
+---
+- name: restart zabbix-agent
+  ansible.builtin.service:
+    name: zabbix-agent
+    state: restarted
+
+- name: reload firewalld
+  ansible.builtin.service:
+    name: firewalld
+    state: reloaded

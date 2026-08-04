@@ -1,0 +1,22 @@
+---
+# IP адрес ELK сервера (автоматически определяется из inventory)
+elk_ip: "{{ ansible_default_ipv4['address'] | default('10.0.3.10') }}"
+
+# Версии ELK
+elasticsearch_version: "8.11.0"
+kibana_version: "8.11.0"
+logstash_version: "8.11.0"
+
+# Параметры ELK
+elasticsearch_heap_size: "1g"
+elasticsearch_password: "changeme"  # В production использовать сложный пароль!
+
+# Порты
+kibana_port: 5601
+logstash_beats_port: 5044
+logstash_syslog_port: 5000
+logstash_http_port: 8088
+
+# Безопасность
+xpack_security_enabled: true
+xpack_https_enabled: false  # Для локальной разработки

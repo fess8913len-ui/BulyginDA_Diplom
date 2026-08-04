@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:{{ elasticsearch_version }}
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - ELASTIC_PASSWORD={{ elasticsearch_password }}
+      - xpack.security.enabled={{ xpack_security_enabled }}
+      - xpack.security.http.ssl.enabled={{ xpack_https_enabled }}
+      - ES_JAVA_OPTS=-Xms{{ elasticsearch_heap_size }} -Xmx{{ elasticsearch_heap_size }}
+      - xpack.monitoring.enabled=true
+    ports:
+      - "127.0.0.1:9200:9200"
+      - "127.0.0.1:9300:9300"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    restart: unless-stopped
+    networks:
+      - elk
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:{{ logstash_version }}
+    container_name: logstash
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USER=elastic
+      - ELASTICSEARCH_PASSWORD={{ elasticsearch_password }}
+    ports:
+      - "{{ logstash_beats_port }}:{{ logstash_beats_port }}"
+      - "{{ logstash_syslog_port }}:{{ logstash_syslog_port }}"
+      - "{{ logstash_http_port }}:{{ logstash_http_port }}"
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline
+      - ./logstash/config:/usr/share/logstash/config
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+    networks:
+      - elk
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:{{ kibana_version }}
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTICSEARCH_PASSWORD={{ elasticsearch_password }}
+      - SERVER_PUBLICBASEURL=http://{{ ansible_default_ipv4.address }}:{{ kibana_port }}
+      - XPACK_SECURITY_ENABLED={{ xpack_security_enabled }}
+    ports:
+      - "{{ kibana_port }}:{{ kibana_port }}"
+    volumes:
+      - ./kibana/kibana.yml:/usr/share/kibana/config/kibana.yml
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+    networks:
+      - elk
+
+networks:
+  elk:
+    driver: bridge
+
+volumes:
+  es_data:
+    driver: local

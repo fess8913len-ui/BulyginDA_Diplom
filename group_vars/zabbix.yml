@@ -1,0 +1,36 @@
+---
+
+postgresql_zabbix_password: "my_secure_password_123"
+postgresql_version: 14
+
+# Общие переменные для Zabbix
+zabbix_server_version: "7.0"
+zabbix_db_type_long: "postgresql"
+
+# Zabbix Server
+zabbix_server_database: pgsql
+zabbix_server_dbuser: zabbix
+zabbix_server_dbpassword: "{{ postgresql_zabbix_password }}"
+zabbix_server_dbhost: localhost
+zabbix_server_dbname: zabbix
+
+# Zabbix Web
+zabbix_web_version: "7.0"
+zabbix_web_database: pgsql
+zabbix_web_dbuser: zabbix
+zabbix_web_dbpassword: "{{ postgresql_zabbix_password }}"
+zabbix_web_dbhost: localhost
+zabbix_web_dbname: zabbix
+zabbix_web_timezone: "Europe/Moscow"
+zabbix_web_http_server: "nginx"
+zabbix_web_user: "nginx"
+zabbix_web_group: "nginx"
+
+# Zabbix Agent
+zabbix_agent_server: "{{ ansible_default_ipv4.address }}"
+zabbix_agent_serveractive: "{{ ansible_default_ipv4.address }}"
+zabbix_agent_version: "7.0"
+# PHP
+zabbix_php_fpm_dir: "/etc/php-fpm.d"
+zabbix_php_fpm_listen: "/run/php-fpm/zabbix.sock"
+zabbix_php_fpm_session: "/var/lib/php/session"

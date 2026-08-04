@@ -1,0 +1,3 @@
+---
+# Переменные для web серверов
+elk_ip: "{{ hostvars['elk']['ansible_default_ipv4']['address'] }}"  # IP ELK сервера

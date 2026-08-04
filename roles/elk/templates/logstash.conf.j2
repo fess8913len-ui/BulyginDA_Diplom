@@ -1,0 +1,48 @@
+input {
+  beats {
+    port => 5044
+  }
+}
+
+filter {
+  # Разделяем по типу логов
+  if [type] == "nginx_access" {
+    grok {
+      match => { "message" => '%{IPORHOST:client_ip} - - \[%{HTTPDATE:timestamp}\] "%{WORD:method} %{URIPATHPARAM:request} HTTP/%{NUMBER:http_version}" %{NUMBER:response_code} %{NUMBER:body_sent_bytes} "%{DATA:referrer}" "%{DATA:user_agent}"' }
+    }
+    date {
+      match => [ "timestamp", "dd/MMM/yyyy:HH:mm:ss Z" ]
+    }
+    mutate {
+      add_field => { "log_type" => "nginx_access" }
+    }
+  }
+  
+  if [type] == "nginx_error" {
+    mutate {
+      add_field => { "log_type" => "nginx_error" }
+    }
+  }
+  
+  # Добавляем geoip для IP адресов
+  if [client_ip] {
+    geoip {
+      source => "client_ip"
+      target => "geoip"
+      database => "/usr/share/logstash/GeoLite2-City.mmdb"
+    }
+  }
+}
+
+output {
+  elasticsearch {
+    hosts => ["elasticsearch:9200"]
+    index => "nginx-logs-%{+YYYY.MM.dd}"
+    user => "elastic"
+    password => "{{ elasticsearch_password }}"
+  }
+  
+  stdout {
+    codec => rubydebug
+  }
+}

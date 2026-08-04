@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Дипломная работа Булыгина Д.А.</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .info {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .server-info {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+        .health-status {
+            background: #4CAF50;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 20px;
+            display: inline-block;
+        }
+        .health-status a {
+            color: white;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>🏆 Дипломная работа Булыгина Д.А.</h1>
+    <div class="info">
+        <p>Добро пожаловать на веб-сервер!</p>
+        <p>Это демонстрационная страница для дипломной работы</p>
+    </div>
+    <div class="server-info">
+        <p>Сервер: {{ ansible_hostname }}</p>
+        <p>IP адрес: {{ ansible_default_ipv4.address }}</p>
+        <p>ОС: {{ ansible_distribution }} {{ ansible_distribution_version }}</p>
+    </div>
+    <div class="health-status">
+        <a href="/ping">✅ Health Check Endpoint /ping</a>
+    </div>
+</body>
+</html>

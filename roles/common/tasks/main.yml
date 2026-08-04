@@ -1,0 +1,46 @@
+---
+- name: Обновление кэша пакетов
+  package:
+    update_cache: yes
+  when: ansible_os_family == "RedHat" or ansible_os_family == "Debian"
+
+#- name: Установка базовых пакетов
+#  package:
+#   name:
+#     - curl
+#     - wget
+#     - git
+#     - htop
+#     - net-tools
+#     - nc
+#     - telnet
+#     - bind-utils
+#   state: present
+
+- name: Установка firewalld
+  package:
+    name: firewalld
+    state: present
+  when: ansible_os_family == "RedHat"
+
+- name: Запуск и включение firewalld
+  systemd:
+    name: firewalld
+    state: started
+    enabled: yes
+  async: 10
+  poll: 2
+  when: ansible_os_family == "RedHat"
+
+- name: Добавление SSH в исключения firewalld
+  firewalld:
+    service: ssh
+    permanent: yes
+    state: enabled
+    immediate: yes
+  when: ansible_os_family == "RedHat"
+
+- name: Настройка системного времени
+  timezone:
+    name: Europe/Moscow
+  when: ansible_os_family == "RedHat" or ansible_os_family == "Debian"

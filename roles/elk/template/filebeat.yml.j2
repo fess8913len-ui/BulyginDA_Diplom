@@ -1,0 +1,36 @@
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /var/log/*.log
+    - /var/log/**/*.log
+    - /var/log/nginx/*.log
+    - /var/log/zabbix/*.log
+    - /var/log/httpd/*.log
+  fields:
+    hostname: "{{ ansible_hostname }}"
+    source: "{{ inventory_hostname }}"
+    environment: "production"
+
+- type: system
+  enabled: true
+  paths:
+    - /var/log/messages
+    - /var/log/syslog
+
+output.logstash:
+  hosts: ["{{ elk_ip }}:{{ logstash_beats_port }}"]
+
+# Для отправки напрямую в Elasticsearch (с аутентификацией):
+# output.elasticsearch:
+#   hosts: ["{{ elk_ip }}:9200"]
+#   username: "elastic"
+#   password: "{{ elasticsearch_password }}"
+#   index: "filebeat-%{+YYYY.MM.dd}"
+
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
