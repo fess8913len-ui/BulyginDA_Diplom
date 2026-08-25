@@ -21,6 +21,27 @@
   changed_when: "'version' in compose_update.stdout"
   tags: [elk]
 
+- name: Замена пароля Elasticsearch в .env
+  replace:
+    path: /opt/elk/.env
+    regexp: '^ELASTIC_PASSWORD=.*$'
+    replace: "ELASTIC_PASSWORD='{{ elasticsearch_password }}'"
+  tags: [elk]
+
+- name: Замена пароля Logstash в .env
+  replace:
+    path: /opt/elk/.env
+    regexp: '^LOGSTASH_INTERNAL_PASSWORD=.*$'
+    replace: "LOGSTASH_INTERNAL_PASSWORD='{{ logstash_internal_password }}'"
+  tags: [elk]
+
+- name: Замена пароля Kibana в .env
+  replace:
+    path: /opt/elk/.env
+    regexp: '^KIBANA_SYSTEM_PASSWORD=.*$'
+    replace: "KIBANA_SYSTEM_PASSWORD='{{ kibana_system_password }}'"
+  tags: [elk]
+
 - name: Запуск Elasticsearch
   shell: |
     cd /opt/elk

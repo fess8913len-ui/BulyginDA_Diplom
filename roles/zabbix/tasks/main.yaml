@@ -64,6 +64,18 @@
   changed_when: true
   ignore_errors: true
 
+- name: Смена пароля администратора Zabbix (веб-интерфейс)
+  become: yes
+  become_user: postgres
+  community.postgresql.postgresql_query:
+    db: zabbix
+    login_host: localhost
+    login_user: postgres
+    query: "UPDATE users SET passwd='{{ zabbix_admin_password | password_hash('bcrypt') }}' WHERE username='Admin'"
+  no_log: true
+  tags: [zabbix, security]
+  when: zabbix_admin_password is defined
+
 - name: Configure PHP session directory permissions for Zabbix
   file:
     path: /var/lib/php/session

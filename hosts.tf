@@ -67,7 +67,7 @@ resource "yandex_compute_instance" "elk" {
 
   network_interface {
     subnet_id          = yandex_vpc_subnet.public_elk.id #зона ВМ должна совпадать с зоной subnet!!!
-    nat                = true
+    nat                = false
     security_group_ids = [yandex_vpc_security_group.elk.id]
   }
 }
