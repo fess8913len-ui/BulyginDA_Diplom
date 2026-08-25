@@ -66,12 +66,14 @@
 
 - name: Смена пароля администратора Zabbix (веб-интерфейс)
   become: yes
-  become_user: postgres
+  become_user: zabbix
   community.postgresql.postgresql_query:
     db: zabbix
     login_host: localhost
-    login_user: postgres
-    query: "UPDATE users SET passwd='{{ zabbix_admin_password | password_hash('bcrypt') }}' WHERE username='Admin'"
+    login_user: zabbix
+    login_password: "{{ postgresql_zabbix_password  }}"
+    query: "UPDATE users SET passwd='{{ zabbix_web_pass_hash }}' WHERE username='Admin'"
+
   no_log: true
   tags: [zabbix, security]
   when: zabbix_admin_password is defined

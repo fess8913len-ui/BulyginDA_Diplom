@@ -9,7 +9,7 @@ logstash_version: "8.11.0"
 
 # Параметры ELK
 elasticsearch_heap_size: "1g"
-elasticsearch_data_dir: "/var/lib/elasticsearch"  # ← перенесено из vars
+elasticsearch_data_dir: "/var/lib/elasticsearch"
 
 
 elasticsearch_password: !vault |
@@ -42,7 +42,7 @@ kibana_system_password: !vault |
 
 # Порты
 kibana_port: 5601
-kibana_host: "0.0.0.0"  # ← перенесено из vars
+kibana_host: "0.0.0.0"
 logstash_beats_port: 5044
 logstash_syslog_port: 5000
 logstash_http_port: 8088
